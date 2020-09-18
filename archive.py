@@ -52,10 +52,10 @@ def archive_one(event, cache_coll, fs, pkey_fp, parsemain):
         raw = parsemain(typetag, orgid, timezone, data)
 
         if raw:
-#            cache_coll.update_one(
-#                {"_id": event["_id"]},
-#                {"$set": {"processed": True}, "$addToSet": {"_ref": raw._hash}},
-#            )
+            cache_coll.update_one(
+                {"_id": event["_id"]},
+                {"$set": {"processed": True}, "$addToSet": {"_ref": raw._hash}},
+            )
             return True
         else:
             return False
@@ -105,8 +105,8 @@ def archive(cacheconfig):
 
     while True:
         try:
-            #cursor = cache_coll.find({"processed": False}).limit(10000)
-            cursor = cache_coll.find({"processed": False,"typtag":"unr-honeypot"}).limit(120)
+            cursor = cache_coll.find({"processed": False}).limit(10000)
+            #cursor = cache_coll.find({"processed": False,"typtag":"unr-honeypot"}).limit(120)
             any_success = False
             for e in cursor:
                 s = archive_one(e, cache_coll, fs, private_key_file_path, parsemain)
