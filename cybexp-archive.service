@@ -8,7 +8,7 @@ After=network-online.target
 
 User=cybexp-archive
 Group=cybexp-module
-WorkingDirectory=/opt/cybexp/proc/archive
+WorkingDirectory=/opt/cybexp/archive
 
 Type=simple
 ExecStart=/opt/cybexp/env/bin/python3 /opt/cybexp/archive/archive.py /etc/cybexp/archive/config.json
