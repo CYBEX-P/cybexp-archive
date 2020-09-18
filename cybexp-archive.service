@@ -1,0 +1,24 @@
+[Unit]
+Description=Cybex-P's Archive Module
+
+After=network-online.target
+
+
+[Service]
+
+User=cybexp-archive
+Group=cybexp-module
+WorkingDirectory=/opt/cybexp/proc/archive
+
+Type=simple
+ExecStart=/opt/cybexp/env/bin/python3 /opt/cybexp/archive/archive.py /etc/cybexp/archive/config.json
+
+#KillSignal=SIGUSR1
+
+
+Restart=on-failure
+RestartSec=5
+#RestartPreventExitStatus=SIGUSR1
+
+[Install]
+WantedBy=multi-user.target
