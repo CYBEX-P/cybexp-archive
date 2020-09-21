@@ -203,7 +203,7 @@ if __name__ == "__main__":
 
         
 
-    archive(copy.deepcopy(cacheconfig))
+    archive(copy.deepcopy(cacheconfig), args.force_process, args.run_once)
 
 
 
