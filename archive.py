@@ -10,7 +10,7 @@ from pathlib import Path
 import argparse
 
 import parsemain
-from parsemain import parsemain
+#from parsemain import parsemain # called inside the function
 import loadconfig
 
 
@@ -38,7 +38,7 @@ def exponential_backoff(n):
     time.sleep(s)
 
 
-def archive_one(event, cache_coll, fs, pkey_fp, parsemain):
+def archive_one(event, cache_coll, fs, pkey_fp, parsemain_func):
     try:
         try:
             typetag = event["typetag"]
@@ -52,33 +52,33 @@ def archive_one(event, cache_coll, fs, pkey_fp, parsemain):
         f = fs.get(fid)
         data = str(decrypt_file(f))
 
-        state, raw = parsemain(typetag, orgid, timezone, data)
+        state, raw = parsemain_func(typetag, orgid, timezone, data)
 
-        if state == parsemain.S_SUCCESS:
+        if state == parsemain.STATE.SUCCESS:
             cache_coll.update_one(
                 {"_id": event["_id"]},
-                {"$set": {"processed": True}, "$addToSet": {"_ref": raw._hash}, {"$unset": {"special":1, "state":1}}},
+                {"$set": {"processed": True}, "$addToSet": {"_ref": raw._hash}, "$unset": {"skip":1, "state":1}}
             )
             return True
-        elif state == parsemain.S_NOT_SUPPORTED:
+        elif state == parsemain.STATE.NOT_SUPPORTED:
             cache_coll.update_one(
                 {"_id": event["_id"]},
-                {"$set": {"processed": False}, "$set": {"state": "typetag_not_supported", "special": True}},
+                {"$set": {"state": "typetag_not_supported", "skip": True}},
             )
-            return False
-        elif state == parsemain.S_ERROR:
+            return True
+        elif state == parsemain.STATE.ERROR:
             cache_coll.update_one(
                 {"_id": event["_id"]},
-                {"$set": {"processed": False}, "$set": {"state": "server_error", "special": True}},
+                {"$set": {"state": "error", "skip": True}},
             )
             return False
         return False # catch all
     except gridfs.errors.CorruptGridFile:
         cache_coll.update_one(
             {"_id": event["_id"]},
-            {"$set": {"processed": False}, "$set": {"state": "bad_data", "special": True}},
+            {"$set": {"state": "bad_data", "skip": True}},
         )
-        return False
+        return True
 
     except (KeyboardInterrupt, SystemExit):
             raise
@@ -102,7 +102,7 @@ def archive(cacheconfig, force_process=False, exec_once=False):
             private_key_file_path = cacheconfig.pop("private_key", "priv.pem")
             
 
-            from parsemain import parsemain  # don't move to top
+            from parsemain import parsemain as parsemain_func  # don't move to top
 
             break
 
@@ -120,14 +120,14 @@ def archive(cacheconfig, force_process=False, exec_once=False):
     while True:
         try:
             if force_process:
-                query = {"processed": False, "special": False}
-            else:
                 query = {"processed": False}
+            else:
+                query = {"processed": False, "skip": {"$ne": True}}
             cursor = cache_coll.find(query).limit(10000)
             #cursor = cache_coll.find({"processed": False,"typtag":"unr-honeypot"}).limit(120)
             any_success = False
             for e in cursor:
-                s = archive_one(e, cache_coll, fs, private_key_file_path, parsemain)
+                s = archive_one(e, cache_coll, fs, private_key_file_path, parsemain_func)
                 any_success = any_success or s
 
             if any_success:
@@ -156,17 +156,11 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "config_file",
-        metavar="config-file",
+        "conf_path",
+        metavar="conf-path",
         help="filename of JSON file containing configuration. [config.json]",
         default="config.json",
     )
-    parser.add_argument(
-        "--config-file",
-        help="filename of JSON file containing array of configs to run. Disables connection to databse and live update.",
-        default=None,
-    )
-
     parser.add_argument(
         '-f',
         '--force-process',
@@ -182,7 +176,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     
-    conf_path = Path(args.config_file).resolve()
+    conf_path = Path(args.conf_path).resolve()
     if not conf_path.is_file():
             parser.error("{} does not exist or is not a file".format(conf_path))
 
@@ -210,5 +204,5 @@ if __name__ == "__main__":
 
 
 # TODO
-# index "special" field in DB
+# index "skip" field in DB
 
