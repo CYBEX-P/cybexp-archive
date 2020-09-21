@@ -12,7 +12,21 @@ def set_backend(config_loc):
     _BACKEND = loadconfig.get_tahoe_backend(config_loc)
     Instance._backend = _BACKEND
 
+
+
+S_SUCCESS = 0
+S_NOT_SUPPORTED = 1
+S_ERROR = 2
+
 def parsemain(typtag, orgid, timezone, data):
+    """
+    returns
+    -------
+    state: 
+        returns errors codes of success codes.
+    raw(tahoe.Raw):
+        return the raw tahow object if successful. else is None
+    """
     try:
         raw_sub_type = {
             "unr-honeypot": "unr_honeypot",
@@ -24,6 +38,9 @@ def parsemain(typtag, orgid, timezone, data):
             logging.warning(
                 "\nproc.archive.parsemain -- Unknown typtag : " + str(typtag)
             )
-        return raw
+            return S_NOT_SUPPORTED, raw
+
+        return S_SUCCESS, raw
     except:
         logging.error("\nproc.archive.parsemain -- " + str(typtag), exc_info=True)
+        return S_ERROR, None
