@@ -23,9 +23,9 @@ def parsemain(typtag, orgid, timezone, data):
     returns
     -------
     state: 
-        returns errors codes of success codes.
+        returns errors codes or success codes.
     raw(tahoe.Raw):
-        return the raw tahow object if successful. else is None
+        return the raw tahoe object if successful. else is None
     """
     try:
         raw_sub_type = {
