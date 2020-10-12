@@ -12,6 +12,23 @@ import loadconfig
 
 
 def decrypt_file(file_in, fpriv_name="priv.pem"):
+    """
+    Takes in the the data that was encrypted by the crypto file from the API. The data comes in the form
+    of a large bytearray representing single byte values. A check is made to see if the data passed is 
+    constructed of bytes. If a check is passed, the encrypted session key, nonce, tags, and cipher text
+    are pulled from passed 'file_in' along with the private key being imported in from 'fpriv_name'. The
+    session key is then decrypted from the provided private RSA key. The actual passed data is then decrypted
+    with the decrypted session key. The real data is then return via a 'utf-8' decoding. 
+
+    Parameters
+    ----------
+    file_in: a data set consisting of byte ints
+        the encoded data from the API query module that comes in the form of a large string of integers
+    fpive_name: the private key
+        the private key that is used to decrypt the session key
+        
+
+    """
     if isinstance(file_in, bytes):
         file_in = io.BytesIO(file_in)
     private_key = RSA.import_key(open(fpriv_name).read())
@@ -36,6 +53,29 @@ def exponential_backoff(n):
 
 
 def archive_one(event, cache_coll, fs, pkey_fp, parsemain):
+    """
+    this function serves as a utility piece for the main archive function. from the 'event' parameter,
+    the function pulls out the typetag, org id, timezone, and the file id. the file id is then used to pull
+    the corresponding file with the encrypted data to get decrypted from the decrypt_file() function. The 
+    decrypted data along with the other tags are then passed into parsemain() to be created into a raw TAHOE
+    instance object. If the raw object from parsemain is true, an update to the cache collection is made with: 
+    the id of the event, the processed data being set to true, and the reference hash of the raw TAHOE instance. 
+    a 'True' value is then returned to notify the archive function of a successful attempt, otherwise a 'False' 
+    value is returned.
+
+    Parameters
+    ----------
+    event: dictionary of strings
+         
+
+    Raises
+    ------
+    KeyError
+        Invalid typetag
+    KeyboardInterrupt
+        Exit the system
+    
+    """
     try:
         try:
             typetag = event["typetag"]
@@ -75,6 +115,27 @@ def archive_one(event, cache_coll, fs, pkey_fp, parsemain):
 
 
 def archive(cacheconfig):
+    """
+    Main archive module function. When called, it is passed a 'cacheconfig', a raw object containing
+    the cache input configurations and all the unprocessed data along with the proper itype tags that
+    were sorted out back in the API. Before the unprocessed data gets archived, the cache input configurations 
+    and private key path are pulled from 'cacheconfig'. The collection of unprocessed events is then iterated 
+    through for events that are unprocessed. An attempt is then made to parse the event into a raw TAHOE instance.
+    If an attempt is unsuccessful, a failed attempt check is made.
+    
+    Parameters
+    ----------
+    cacheconfig: TDQL Tahoe object from the API
+        contains objects and references such as the database URL, the cache collection,
+        private key file path, and the unprocessed data with the indicated type tags
+
+    
+    Raises
+    ------
+    KeyboardInterrupt
+        Call for a System Exit
+
+    """
     n_failed_attempts = 0
     while True:
         try:

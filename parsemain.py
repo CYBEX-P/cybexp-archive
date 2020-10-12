@@ -13,6 +13,22 @@ def set_backend(config_loc):
     Instance._backend = _BACKEND
 
 def parsemain(typtag, orgid, timezone, data):
+    """
+    This function takes the provided parameters and passes them to be made into a raw
+    TAHOE instance that holds the tags and data.
+    ----------
+    typtag: String
+        tag that indicates the type of data
+        Example: a typetag can be labeled a tahoe 'attribute'
+    orgid: String
+        name of the source or organizations
+    timezone: String
+        the indiciated timezone
+    data: Dictionary or Large list of Strings
+        the raw unprocessed data
+    
+
+    """
     try:
         raw_sub_type = {
             "unr-honeypot": "unr_honeypot",
