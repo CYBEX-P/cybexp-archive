@@ -48,6 +48,11 @@ def decrypt_file(file_in, fpriv_name="priv.pem"):
 
 
 def exponential_backoff(n):
+    """
+    Used in the case of not overwhelming the server. In most cases, this function is not needed as any
+    successful attempt at archiving an event in the archive() function will resert the value that is passed
+    as 'n' to this function to 0.
+    """
     s = min(3600, (2 ** n) + (random.randint(0, 1000) / 1000))
     time.sleep(s)
 

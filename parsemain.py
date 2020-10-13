@@ -26,7 +26,6 @@ def parsemain(typtag, orgid, timezone, data):
         the indiciated timezone
     data: Dictionary or Large list of Strings
         the raw unprocessed data
-    
 
     """
     try:
