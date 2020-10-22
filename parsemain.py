@@ -7,11 +7,10 @@ from tahoe import Instance, Raw, MongoBackend
 
 _BACKEND = None
 
-class parse_state(Enum):
+class ParseState(Enum):
     SUCCESS = 0
     NOT_SUPPORTED = 1
     ERROR = 2
-STATE = parse_state()
 
 if __name__ == "__main__": # skip execution if imported
     _BACKEND = loadconfig.get_tahoe_backend()
@@ -34,7 +33,6 @@ def parsemain(typtag, orgid, timezone, data):
     raw(tahoe.Raw):
         return the raw tahoe object if successful. else is None
     """
-    global STATE
     try:
         raw_sub_type = {
             "unr-honeypot": "unr_honeypot",
@@ -46,10 +44,10 @@ def parsemain(typtag, orgid, timezone, data):
             logging.warning(
                 "\nproc.archive.parsemain -- Unknown typtag : " + str(typtag)
             )
-            return STATE.NOT_SUPPORTED, raw
+            return ParseState.NOT_SUPPORTED, raw
 
-        return STATE.SUCCESS, raw
+        return ParseState.SUCCESS, raw
     except:
         logging.error("\nproc.archive.parsemain -- " + str(typtag), exc_info=True)
-        return STATE.ERROR, None
+        return ParseState.ERROR, None
 
