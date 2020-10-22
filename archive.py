@@ -54,19 +54,19 @@ def archive_one(event, cache_coll, fs, pkey_fp, parsemain_func):
 
         state, raw = parsemain_func(typetag, orgid, timezone, data)
 
-        if state == parsemain.STATE.SUCCESS:
+        if state == parsemain.ParseState.SUCCESS:
             cache_coll.update_one(
                 {"_id": event["_id"]},
                 {"$set": {"processed": True}, "$addToSet": {"_ref": raw._hash}, "$unset": {"skip":1, "state":1}}
             )
             return True
-        elif state == parsemain.STATE.NOT_SUPPORTED:
+        elif state == parsemain.ParseState.NOT_SUPPORTED:
             cache_coll.update_one(
                 {"_id": event["_id"]},
                 {"$set": {"state": "typetag_not_supported", "skip": True}},
             )
             return True
-        elif state == parsemain.STATE.ERROR:
+        elif state == parsemain.ParseState.ERROR:
             cache_coll.update_one(
                 {"_id": event["_id"]},
                 {"$set": {"state": "error", "skip": True}},
