@@ -1,17 +1,11 @@
-
-
 import io, time, gridfs, logging, json, copy, random, multiprocessing, os, pdb
 from pymongo import MongoClient
 from pymongo.errors import CursorNotFound
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES, PKCS1_OAEP
-import sys
-from pathlib import Path
-import argparse
-
-import parsemain
-#from parsemain import parsemain # called inside the function
+from parsemain import parsemain
 import loadconfig
+
 
 
 def decrypt_file(file_in, fpriv_name="priv.pem"):
@@ -38,47 +32,33 @@ def exponential_backoff(n):
     time.sleep(s)
 
 
-def archive_one(event, cache_coll, fs, pkey_fp, parsemain_func):
+def archive_one(event, cache_coll, fs, pkey_fp, parsemain):
     try:
-        try:
-            typetag = event["typetag"]
-        except KeyError:
-            typetag = event["typtag"]
+        typetag = event["typetag"]
         orgid = event["orgid"]
-        #upload_time = event["timestamp"]
+        upload_time = event["timestamp"]
         timezone = event["timezone"]
 
         fid = event["fid"]
         f = fs.get(fid)
         data = str(decrypt_file(f))
 
-        state, raw = parsemain_func(typetag, orgid, timezone, data)
+        raw = parsemain(typetag, orgid, timezone, data)
 
-        if state == parsemain.ParseState.SUCCESS:
+        if raw:
             cache_coll.update_one(
                 {"_id": event["_id"]},
-                {"$set": {"processed": True}, "$addToSet": {"_ref": raw._hash}, "$unset": {"skip":1, "state":1}}
+                {"$set": {"processed": True}, "$addToSet": {"_ref": raw._hash}},
             )
             return True
-        elif state == parsemain.ParseState.NOT_SUPPORTED:
-            cache_coll.update_one(
-                {"_id": event["_id"]},
-                {"$set": {"state": "typetag_not_supported", "skip": True}},
-            )
-            return True
-        elif state == parsemain.ParseState.ERROR:
-            cache_coll.update_one(
-                {"_id": event["_id"]},
-                {"$set": {"state": "error", "skip": True}},
-            )
+        else:
             return False
-        return False # catch all
     except gridfs.errors.CorruptGridFile:
         cache_coll.update_one(
             {"_id": event["_id"]},
-            {"$set": {"state": "bad_data", "skip": True}},
+            {"$set": {"processed": True}, "$set": {"bad_data": True}},
         )
-        return True
+        return False
 
     except (KeyboardInterrupt, SystemExit):
             raise
@@ -88,21 +68,14 @@ def archive_one(event, cache_coll, fs, pkey_fp, parsemain_func):
         return False
 
 
-def archive(cacheconfig, force_process=False, exec_once=False):
+def archive():
     n_failed_attempts = 0
     while True:
         try:
-            cache_mongo_url = cacheconfig.pop("mongo_url")
-            cache_client = MongoClient(cache_mongo_url)
-            cache_db = cache_client.get_database(
-                cacheconfig.pop("cache_db", "cache_db"))
-            cache_coll = cache_db.get_collection(
-                cacheconfig.pop("cache_coll", "file_entries"))
-            fs = gridfs.GridFS(cache_db)
-            private_key_file_path = cacheconfig.pop("private_key", "priv.pem")
-            
+            cache_coll, fs = loadconfig.get_cache_db()
+            private_key_file_path = "priv.pem"            
 
-            from parsemain import parsemain as parsemain_func  # don't move to top
+            from parsemain import parsemain  # don't move to top
 
             break
 
@@ -119,22 +92,16 @@ def archive(cacheconfig, force_process=False, exec_once=False):
 
     while True:
         try:
-            if force_process:
-                query = {"processed": False}
-            else:
-                query = {"processed": False, "skip": {"$ne": True}}
-            cursor = cache_coll.find(query).limit(10000)
-            #cursor = cache_coll.find({"processed": False,"typtag":"unr-honeypot"}).limit(120)
+            cursor = cache_coll.find({"processed": False}).limit(10000)
             any_success = False
             for e in cursor:
-                s = archive_one(e, cache_coll, fs, private_key_file_path, parsemain_func)
+                s = archive_one(e, cache_coll, fs, private_key_file_path, parsemain)
                 any_success = any_success or s
 
             if any_success:
                 n_failed_attempts = 0
             else:
                 n_failed_attempts += 1
-            n_failed_attempts = 0
 
         except CursorNotFound:
             n_failed_attempts += 1
@@ -148,61 +115,12 @@ def archive(cacheconfig, force_process=False, exec_once=False):
 
         exponential_backoff(n_failed_attempts)
 
-        if exec_once:
-            break
-
 
 if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "conf_path",
-        metavar="conf-path",
-        help="filename of JSON file containing configuration. [config.json]",
-        default="config.json",
-    )
-    parser.add_argument(
-        '-f',
-        '--force-process',
-        help='Force process all unprocessed data, includes previously unsuported data.',
-        action='store_true',
-        default=False)
-    parser.add_argument(
-        '-o',
-        '--run-once',
-        help='Do not loop undefinatelly throught the database, just do it once and exit.',
-        action='store_true',
-        default=False)
-
-    args = parser.parse_args()
-    
-    conf_path = Path(args.conf_path).resolve()
-    if not conf_path.is_file():
-            parser.error("{} does not exist or is not a file".format(conf_path))
-
-
+##    logging.basicConfig(filename = 'api.log') 
     logging.basicConfig(
-        level=logging.DEBUG, format="%(asctime)s %(levelname)s:%(message)s"
-    )  # filename = 'archive.log',
-
-    try:
-        cacheconfig = loadconfig.get_cacheconfig(conf_path)
-        parsemain.set_backend(conf_path)
-    except:
-        logging.error(
-                "proc.archive.archive: Bad Archive Config -- ",
-                exc_info=True,
-            )
-        sys.exit(1)
-
-        
-
-    archive(copy.deepcopy(cacheconfig), args.force_process, args.run_once)
-
-
-
-
-
-# TODO
-# index "skip" field in DB
-
+        level=logging.ERROR,
+        format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s' \
+        ' - %(funcName)() --  %(message)s'
+    )
+    archive()

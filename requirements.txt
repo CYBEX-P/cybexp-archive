@@ -1,0 +1,9 @@
+decorator==4.4.2
+mongomock==3.22.1
+networkx==2.5.1
+pycryptodome==3.10.1
+pyjwt==2.0.1
+pymongo==3.11.3
+sentinels==1.0.0
+six==1.15.0
+
